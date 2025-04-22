@@ -91,5 +91,12 @@ const userSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
+
+// Indexes for performance
+userSchema.index({ location: '2dsphere' }); // Geospatial queries for users
+userSchema.index({ email: 1 }); // Fast email lookups
+userSchema.index({ role: 1 }); // Fast role-based queries
+
+
 const User = mongoose.model("User", userSchema);
 export default User;
