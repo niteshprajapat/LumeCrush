@@ -23,6 +23,16 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    profilePicture: {
+        url: {
+            type: String,
+            default: "",
+        },
+        public_id: {
+            type: String,
+            default: "",
+        },
+    },
     age: {
         type: Number,
         required: true,
@@ -59,7 +69,8 @@ const userSchema = new mongoose.Schema({
             default: "Point",
         },
         coordinates: {
-            type: [Number]
+            type: [Number],
+            required: true
         }
     },
     role: {
@@ -87,6 +98,13 @@ const userSchema = new mongoose.Schema({
         boosts: { type: Number, default: 0 }, // Platinum feature
         superlikes: { type: Number, default: 0 }, // Platinum feature
     },
+
+    emailVerificationToken: {
+        type: String,
+    },
+    emailVerificationTokenExpires: {
+        type: Date,
+    }
 
 
 }, { timestamps: true });
