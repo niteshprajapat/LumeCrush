@@ -2,7 +2,7 @@ import User from "../models/user.model.js";
 import argon2 from 'argon2'
 import jwt from 'jsonwebtoken'
 import { logger } from "../utils/logger.js"
-import { sendAccountVerificationEmail, sendEmailVerificationToken } from "../services/emailHandler.js";
+import { resendEmailVerificationToken, resetPasswordTokenEmail, sendAccountVerificationEmail, sendEmailVerificationToken } from "../services/emailHandler.js";
 
 
 // register
@@ -236,6 +236,85 @@ export const verifyAccount = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: "Account Verified Successfully!",
+        });
+
+
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Error in verifyAccount API!",
+        });
+    }
+}
+
+// resendToken
+export const resendToken = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(404).json({
+                success: false,
+                message: "Email is required!",
+            });
+        }
+
+        const user = await User.findOne({ email });
+
+        const min = Math.pow(10, 5);
+        const max = Math.pow(10, 6) - 1;
+        const verificationToken = crypto.randomUUID(min, max);
+
+        user.emailVerificationToken = verificationToken;
+        user.emailVerificationTokenExpires = new Date(Date.now() + 5 * 60 * 1000);
+        await user.save();
+
+        await resendEmailVerificationToken(user.email, verificationToken);
+
+        return res.status(200).json({
+            success: true,
+            message: "Resend token Successfully!",
+        });
+
+
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Error in verifyAccount API!",
+        });
+    }
+}
+
+
+// forgotPassword
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(404).json({
+                success: false,
+                message: "Email is required!",
+            });
+        }
+
+        const user = await User.findOne({ email });
+
+        const min = Math.pow(10, 5);
+        const max = Math.pow(10, 6) - 1;
+        const resetToken = crypto.randomUUID(min, max);
+
+        user.resetPasswordToken = resetToken;
+        user.resetPasswordTokenExpires = new Date(Date.now() + 5 * 60 * 1000);
+        await user.save();
+
+        await resetPasswordTokenEmail(user.email, resetToken);
+
+        return res.status(200).json({
+            success: true,
+            message: "Reset Password Token sent Successfully!",
         });
 
 
