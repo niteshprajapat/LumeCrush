@@ -49,3 +49,38 @@ export const sendAccountVerificationEmail = async (userEmail) => {
         console.log(error);
     }
 }
+
+export const resendEmailVerificationToken = async (userEmail, token) => {
+    try {
+        const info = await transporter.sendMail({
+            from: `LumeCrush <${process.env.EMAIL_USER}>`,
+            to: userEmail,
+            subject: "OTP for account verification",
+            text: 'Account Verification OTP',
+            html: `<p>OTP for your account verification: ${token}</p>`
+        });
+
+        console.log(`OTP email sent. ${info.messageId}`);
+
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+
+export const resetPasswordTokenEmail = async (userEmail, token) => {
+    try {
+        const info = await transporter.sendMail({
+            from: `LumeCrush <${process.env.EMAIL_USER}>`,
+            to: userEmail,
+            subject: "Reset Password Token",
+            text: 'Reset Password Token',
+            html: `<p>Token for reset password: ${token}</p>`
+        });
+
+        console.log(`OTP email sent. ${info.messageId}`);
+
+    } catch (error) {
+        console.log(error);
+    }
+}
