@@ -16,6 +16,7 @@ export const isAuthenticated = async (req, res, next) => {
         }
 
         const decoded = await jwt.verify(token, process.env.JWT_SECRET);
+        console.log("decoded", decoded);
 
         if (!decoded) {
             return res.status(400).json({
