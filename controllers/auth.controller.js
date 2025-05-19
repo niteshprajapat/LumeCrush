@@ -2,7 +2,7 @@ import User from "../models/user.model.js";
 import argon2 from 'argon2'
 import jwt from 'jsonwebtoken'
 import { logger } from "../utils/logger.js"
-import { resendEmailVerificationToken, resetPasswordTokenEmail, sendAccountVerificationEmail, sendEmailVerificationToken } from "../services/emailHandler.js";
+import { passswordResetSuccessEmail, resendEmailVerificationToken, resetPasswordTokenEmail, sendAccountVerificationEmail, sendEmailVerificationToken } from "../services/emailHandler.js";
 
 
 // register
@@ -315,6 +315,61 @@ export const forgotPassword = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: "Reset Password Token sent Successfully!",
+        });
+
+
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Error in verifyAccount API!",
+        });
+    }
+}
+
+
+// resetPassword
+export const resetPassword = async (req, res) => {
+    try {
+        const { email, token, newPassword } = req.body;
+
+        if (!email || !token || !newPassword) {
+            return res.status(404).json({
+                success: false,
+                message: "All fields are required!",
+            })
+        }
+
+        const user = await User.findOne({ email });
+
+        if (user.resetPasswordToken !== token) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid Token!",
+            });
+        }
+
+        if (Date.now() > user.resetPasswordTokenExpires) {
+            return res.status(400).json({
+                success: false,
+                message: "Token Expired!",
+            });
+        }
+
+        const hashedPassword = await argon2.hash(newPassword);
+
+        user.password = hashedPassword;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordTokenExpires = undefined;
+
+        await user.save();
+
+
+        await passswordResetSuccessEmail(user.email);
+
+        return res.status(200).json({
+            success: true,
+            message: "Password Reset Successfully!",
         });
 
 
