@@ -84,3 +84,22 @@ export const resetPasswordTokenEmail = async (userEmail, token) => {
         console.log(error);
     }
 }
+
+
+
+export const passswordResetSuccessEmail = async (userEmail) => {
+    try {
+        const info = await transporter.sendMail({
+            from: `LumeCrush <${process.env.EMAIL_USER}>`,
+            to: userEmail,
+            subject: "Password Reset Successfully!",
+            text: 'Password Reset Successfully',
+            html: `<p>Password Reset Successfully!</p>`
+        });
+
+        console.log(`OTP email sent. ${info.messageId}`);
+
+    } catch (error) {
+        console.log(error);
+    }
+}
