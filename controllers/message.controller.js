@@ -113,28 +113,40 @@ export const updateMessagesBymessageId = async (req, res) => {
     try {
         const messageId = req.params.messageId;
         const senderId = req.user._id;
+        const { content } = req.body;
 
-        const message = await Message.findById(messageId);
-        if (message.isDeleted) {
+        if (!content) {
+            return res.status(400).json({
+                success: false,
+                message: "All fields are required!",
+            });
+        }
+
+        const updatedMessage = await Message.findById(messageId);
+        if (updatedMessage.isDeleted) {
             return res.status(400).json({
                 success: false,
                 message: "Message Already Deleted! Message Not Found!"
             });
         }
 
-        if (message.sender.toString() !== senderId.toString()) {
+        if (updatedMessage.sender.toString() !== senderId.toString()) {
             return res.status(400).json({
                 success: false,
-                message: "You can't delete this message! You can only delete your own message!",
+                message: "You can't update this message! You can only update your own message!",
             });
         }
 
-        message.isDeleted = true;
-        await message.save();
+        if (content) {
+            updatedMessage.content = content;
+        }
+
+        await updatedMessage.save();
 
         return res.status(200).json({
             success: true,
-            message: "Message Deleted Successfully!",
+            message: "Message Updated Successfully!",
+            updatedMessage,
         });
 
     } catch (error) {
