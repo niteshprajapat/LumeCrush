@@ -5,7 +5,7 @@ import User from "../models/user.model.js";
 import { logger } from "../utils/logger.js"
 
 
-
+// swipeUser
 export const swipeUser = async (req, res) => {
     try {
         const { target, action } = req.body;
@@ -16,6 +16,13 @@ export const swipeUser = async (req, res) => {
                 success: false,
                 message: "All fields are required!",
             })
+        }
+
+        if (target.toString() === swiperId.toString()) {
+            return res.status(400).json({
+                success: false,
+                message: "You cant swipe to yourself!",
+            });
         }
 
         const swiper = await User.findById(swiperId);
@@ -110,6 +117,33 @@ export const swipeUser = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: `Swiped Successfully to ${action}!`,
+        });
+
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Error in swipeUser API!"
+        })
+    }
+}
+
+
+// getSwipeHistoryOfUser
+export const getSwipeHistoryOfUser = async (req, res) => {
+    try {
+        const swiperId = req.user._id;
+
+        const swipes = await Swipe.find({ swiper: swiperId });
+        console.log("Swipes", swipes);
+
+
+
+
+        return res.status(200).json({
+            success: true,
+            message: `Fetched Swipes Successfully!`,
+            swipes,
         });
 
     } catch (error) {
