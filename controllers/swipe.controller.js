@@ -154,3 +154,36 @@ export const getSwipeHistoryOfUser = async (req, res) => {
         })
     }
 }
+
+// getLikesReceived
+export const getLikesReceived = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const user = await User.findById(userId);
+
+        if (user.subscription.plan !== "platinum") {
+            return res.status(400).json({
+                success: false,
+                message: "This feature is for Platinum Users",
+            });
+        }
+
+        const likes = await Swipe.find({
+            target: userId,
+            action: { $in: ["like", "superLike"] }
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Fetched Likes Received Successfully!",
+            likes,
+        })
+
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Error in getLikesReceived API!"
+        })
+    }
+}
