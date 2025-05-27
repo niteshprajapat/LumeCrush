@@ -1,5 +1,5 @@
 import express from 'express';
-import { forgotPassword, login, register, resendToken, verifyAccount } from '../controllers/auth.controller.js';
+import { forgotPassword, login, register, resendToken, verifyAccount, resetPassword } from '../controllers/auth.controller.js';
 
 
 const router = express.Router();
@@ -12,7 +12,10 @@ router.post("/login", login);
 router.post("/verify-account", verifyAccount);
 router.post("/resend-token", resendToken);
 router.post("/forgot-password", forgotPassword);
-// router.post("/resend-token", resetPassword);
+router.post("/reset-password", resetPassword);
+// change pwd
+// google login
+// github login
 
 
 
