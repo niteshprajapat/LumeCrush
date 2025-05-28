@@ -97,7 +97,27 @@ const userSchema = new mongoose.Schema({
         swipeLimit: { type: Number, default: 100 }, // Daily limit for Free plan
         boosts: { type: Number, default: 0 }, // Platinum feature
         superlikes: { type: Number, default: 0 }, // Platinum feature
+        stripeCustomerId: { type: String, default: null },
+        stripeSubscriptionId: { type: String, default: null },
+        lastReset: { type: Date, default: Date.now },
     },
+    subscriptionHistory: [
+        {
+            plan: {
+                type: String,
+                enum: ["free", "platinum"],
+            },
+            stripeSubsriptionId: {
+                type: String,
+            },
+            startDate: { type: Date },
+            endDate: { type: Date },
+            status: {
+                type: String,
+                enum: ["active", "cancelled", "refunded"],
+            },
+        }
+    ],
 
     emailVerificationToken: {
         type: String,
