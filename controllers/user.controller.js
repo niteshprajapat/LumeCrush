@@ -1,6 +1,13 @@
 import User from "../models/user.model.js";
 import { logger } from "../utils/logger.js"
+import stripe from 'stripe';
+import dotenv from 'dotenv';
+dotenv.config({});
 
+
+
+
+const stripeClient = stripe(process.env.STRIPE_SECRET_KEY);
 
 
 // Use this api to get latitude and longitude using city name
@@ -191,6 +198,78 @@ export const updatePreferences = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Error in getDiscoverUsers API!"
+        })
+    }
+}
+
+
+
+
+export const createCheckoutSession = async (req, res) => {
+    try {
+        const { priceId } = req.body;
+        const userId = req.user._id;
+
+        if (!priceId) {
+            return res.status(400).json({
+                success: false,
+                message: "Price ID for recurring subscription is required!"
+            });
+        }
+
+        const user = await User.findById(userId);
+        if (!user || user.isDeleted) {
+            return res.status(400).json({
+                success: false,
+                message: "User Not Found!",
+            });
+        }
+
+        let stripeCustomerId = user.subscription.stripeCustomerId;
+        if (!stripeCustomerId) {
+            const customer = await stripeClient.customers.create({
+                email: user.email,
+                name: `${user.firstName} ${user.lastName}`,
+                metadata: {
+                    userId: userId.toString(),
+                },
+            });
+
+            stripeCustomerId = customer.id;
+            user.subscription.stripeCustomerId = stripeCustomerId;
+            await user.save();
+        }
+
+        const session = await stripeClient.checkout.sessions.create({
+            customer: stripeCustomerId,
+            payment_method_types: ['card'],
+            mode: "subscription",
+            line_items: [
+                {
+                    price: priceId,
+                    quantity: 1,
+                }
+            ],
+            success_url: 'http://localhost:5173/success',
+            cancel_url: 'http://localhost:5173/cancel',
+            metadata: {
+                userId: userId.toString(),
+            },
+        });
+
+        console.log("session", session);
+
+        return res.status(201).json({
+            success: true,
+            message: "Checkout session created for recurring subscription!",
+            url: session.url,
+        })
+
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Error in createCheckoutSession API!"
         })
     }
 }
