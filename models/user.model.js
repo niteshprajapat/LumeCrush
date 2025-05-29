@@ -107,14 +107,14 @@ const userSchema = new mongoose.Schema({
                 type: String,
                 enum: ["free", "platinum"],
             },
-            stripeSubsriptionId: {
+            stripeSubscriptionId: {
                 type: String,
             },
             startDate: { type: Date },
             endDate: { type: Date },
             status: {
                 type: String,
-                enum: ["active", "cancelled", "refunded"],
+                enum: ["active", "canceled", "refunded"],
             },
         }
     ],
