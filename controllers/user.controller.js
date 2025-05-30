@@ -35,6 +35,8 @@ export const handleStripeWebhook = async (req, res) => {
                 const userId = session.metadata.userId;
                 const subscriptionId = session.subscription;
 
+                logger.info(`Processing checkout.session.completed for userId: ${userId}, subscriptionId: ${subscriptionId}`);
+
                 const user = await User.findById(userId);
                 if (!user) {
                     logger.error('User not found for subscription');
