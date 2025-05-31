@@ -50,29 +50,60 @@ export const handleStripeWebhook = async (req, res) => {
                     return res.status(404).json({ success: false, message: 'User not found' });
                 }
 
+                const subscription = await stripeClient.subscriptions.retrieve(subscriptionId);
+                logger.info(`Subscription details: ${JSON.stringify(subscription, null, 2)}`);
+                console.log("SUBSCRIPTION => ", subscription);
+
+                const subscriptionItem = subscription.items.data[0];
+
+                // Extract the start and end timestamps
+                const currentPeriodStart = subscriptionItem.current_period_start;
+                const currentPeriodEnd = subscriptionItem.current_period_end;
+
                 user.subscription.stripeSubscriptionId = subscriptionId;
                 user.subscription.plan = 'platinum';
-                user.subscription.expiry = null;
+                user.subscription.expiry = new Date(currentPeriodEnd * 1000);
                 user.subscription.swipeLimit = 200;
                 user.subscription.superlikes = 5;
                 user.subscription.boosts = 3;
                 user.subscription.lastReset = new Date();
 
+                console.log("Triggered 1");
+
                 user.subscriptionHistory.push({
                     plan: 'platinum',
                     stripeSubscriptionId: subscriptionId,
-                    startDate: new Date(session.created * 1000),
-                    endDate: null,
+                    startDate: new Date(currentPeriodStart * 1000),
+                    endDate: new Date(currentPeriodEnd * 1000),
                     status: 'active',
                 });
 
+                console.log("Triggered 2");
+
+
                 await user.save();
                 logger.info(`Recurring subscription activated for user ${userId}`);
+
+
+                res.status(200).json({ received: true });
+
                 break;
 
             case 'invoice.payment_succeeded':
                 const invoice = event.data.object;
-                const subId = invoice.subscription;
+                let subId = invoice.subscription;
+
+                if (!subId && invoice.parent && invoice.parent.subscription_details && invoice.parent.subscription_details.subscription) {
+                    subId = invoice.parent.subscription_details.subscription;
+                }
+
+                // Fallback to invoice.lines.data[0].subscription as a last resort
+                if (!subId && invoice.lines && invoice.lines.data && invoice.lines.data.length > 0) {
+                    subId = invoice.lines.data[0].subscription;
+                }
+
+                console.log("INVOICE => ", invoice);
+                console.log("SUBID => ", subId);
 
                 logger.info(`Processing invoice.payment_succeeded for subscriptionId: ${subId}`);
 
@@ -452,20 +483,31 @@ export const cancelSubscription = async (req, res) => {
             { cancel_at_period_end: true }
         );
 
+        console.log("CANCELSUBSC", subscription);
+
+        const subscriptionItem = subscription.items.data[0];
+
+        // Extract the start and end timestamps
+        const currentPeriodStart = subscriptionItem.current_period_start;
+        const currentPeriodEnd = subscriptionItem.current_period_end;
+
+        console.log("CANCELSUBSCcurrentPeriodStart", currentPeriodStart);
+        console.log("CANCELSUBSCcurrentPeriodEnd", currentPeriodEnd);
+
         user.subscriptionHistory.push({
             plan: user.subscription.plan,
             stripeSubscriptionId: user.subscription.stripeSubscriptionId,
             status: 'canceled',
-            startDate: new Date(subscription.created * 1000),
-            endDate: new Date(subscription.current_period_end * 1000),
+            startDate: new Date(currentPeriodStart * 1000),
+            endDate: new Date(currentPeriodEnd * 1000),
         });
 
         user.subscription.plan = "free";
-        user.subscription.expiry = null;
+        user.subscription.expiry = new Date(currentPeriodEnd * 1000);
         user.subscription.swipeLimit = 100;
         user.subscription.superlikes = 0;
         user.subscription.boosts = 0;
-        user.subscription.stripeSubscriptionId = null;
+        // user.subscription.stripeSubscriptionId = null;
         user.subscription.lastReset = new Date();
 
         await user.save();
