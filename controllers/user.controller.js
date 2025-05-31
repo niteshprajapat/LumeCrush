@@ -20,6 +20,8 @@ export const handleStripeWebhook = async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
+    console.log("SIG ===> ", sig);
+    console.log("webhookSecret ===> ", webhookSecret);
     let event;
     try {
         event = stripeClient.webhooks.constructEvent(req.body, sig, webhookSecret);
@@ -36,6 +38,11 @@ export const handleStripeWebhook = async (req, res) => {
                 const subscriptionId = session.subscription;
 
                 logger.info(`Processing checkout.session.completed for userId: ${userId}, subscriptionId: ${subscriptionId}`);
+
+                if (!subscriptionId) {
+                    logger.error('No subscription ID found in checkout.session.completed event');
+                    return res.status(400).json({ success: false, message: 'No subscription created' });
+                }
 
                 const user = await User.findById(userId);
                 if (!user) {
@@ -66,6 +73,14 @@ export const handleStripeWebhook = async (req, res) => {
             case 'invoice.payment_succeeded':
                 const invoice = event.data.object;
                 const subId = invoice.subscription;
+
+                logger.info(`Processing invoice.payment_succeeded for subscriptionId: ${subId}`);
+
+                if (!subId) {
+                    logger.error('No subscription ID found in invoice.payment_succeeded event');
+                    return res.status(400).json({ success: false, message: 'No subscription associated with invoice' });
+                }
+
                 const userWithSub = await User.findOne({ 'subscription.stripeSubscriptionId': subId });
 
                 if (userWithSub) {
