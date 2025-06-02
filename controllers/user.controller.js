@@ -116,7 +116,15 @@ export const handleStripeWebhook = async (req, res) => {
 
                 if (userWithSub) {
                     const subscription = await stripeClient.subscriptions.retrieve(subId);
-                    userWithSub.subscription.expiry = new Date(subscription.current_period_end * 1000);
+                    console.log("DATA => ", subscription);
+
+                    const subscriptionItem = subscription.items.data[0];
+
+                    // Extract the start and end timestamps
+                    const currentPeriodStart = subscriptionItem.current_period_start;
+                    const currentPeriodEnd = subscriptionItem.current_period_end;
+
+                    userWithSub.subscription.expiry = new Date(currentPeriodEnd * 1000);
                     userWithSub.subscription.swipeLimit = 200;
                     userWithSub.subscription.superlikes = 5;
                     userWithSub.subscription.boosts = 3;
@@ -507,7 +515,7 @@ export const cancelSubscription = async (req, res) => {
         user.subscription.swipeLimit = 100;
         user.subscription.superlikes = 0;
         user.subscription.boosts = 0;
-        // user.subscription.stripeSubscriptionId = null;
+        user.subscription.stripeSubscriptionId = null;
         user.subscription.lastReset = new Date();
 
         await user.save();
@@ -522,6 +530,110 @@ export const cancelSubscription = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Error in cancelSubscription API!"
+        })
+    }
+}
+
+
+// requestRefund
+export const requestRefund = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const user = await User.findById(userId);
+
+        if (!user || user.isDeleted) {
+            return res.status(404).json({
+                success: false,
+                message: "User Not Found!",
+            });
+        }
+
+        const activeSubscriptionId = user.subscription.stripeSubscriptionId;
+        if (!activeSubscriptionId) {
+            return res.status(400).json({
+                success: false,
+                message: "No active recurring subscription found for refund!",
+            });
+        }
+
+        const subscription = await stripeClient.subscriptions.retrieve(activeSubscriptionId);
+        console.log("activeSubscriptionId => ", subscription);
+
+        const latestInvoice = await stripeClient.invoices.list({
+            subscription: activeSubscriptionId,
+            limit: 1,
+        });
+
+        console.log("latestInvoice => ", latestInvoice);
+
+        if (!latestInvoice.data.length || !latestInvoice.data[0].charge) {
+            return res.status(400).json({
+                success: false,
+                message: "No recent payment found for refund!",
+            });
+        }
+
+        const paymentIntentId = latestInvoice.data[0].charge;
+        const paymentDate = new Date(latestInvoice.data[0].created * 1000);
+        const daysSincePayment = (Date.now() - paymentDate) / (24 * 60 * 60 * 1000);
+
+        if (daysSincePayment > 7) {
+            return res.status(400).json({
+                success: false,
+                message: "Refund request is outside the 7-day refund policy window for recurring payments!",
+            });
+        }
+
+        const refund = await stripeClient.refunds.create({
+            charge: paymentIntentId,
+            reason: "requested_by_customer",
+        });
+
+        // Cancel the subscription to prevent further charges
+        await stripeClient.subscriptions.update(
+            activeSubscriptionId,
+            { cancel_at_period_end: true },
+        );
+
+        const subscriptionEntry = user.subscriptionHistory.find(
+            entry => entry.stripeSubscriptionId === activeSubscriptionId
+        );
+
+        if (subscriptionEntry) {
+            subscriptionEntry.status = 'refunded';
+            subscriptionEntry.endDate = new Date();
+        } else {
+            user.subscriptionHistory.push({
+                plan: user.subscription.plan,
+                stripeSubscriptionId: activeSubscriptionId,
+                startDate: new Date(subscription.created * 1000),
+                endDate: new Date(),
+                status: 'refunded',
+            });
+        }
+
+        user.subscription.plan = 'free';
+        user.subscription.expiry = new Date();
+        user.subscription.swipeLimit = 100;
+        user.subscription.superlikes = 0;
+        user.subscription.boosts = 0;
+        user.subscription.stripeSubscriptionId = null;
+        user.subscription.lastReset = new Date();
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Refund processed successfully for recurring subscription!",
+            refundId: refund.id,
+        });
+
+
+
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Error in requestRefund API!"
         })
     }
 }
