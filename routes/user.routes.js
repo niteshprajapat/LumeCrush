@@ -1,6 +1,6 @@
 import express from 'express';
 import { isAuthenticated } from '../middlewares/authMiddleware.js';
-import { cancelSubscription, createCheckoutSession, getDiscoverUsers, meProfile, updatePreferences, userProfileByUserId } from '../controllers/user.controller.js';
+import { cancelSubscription, createCheckoutSession, getDiscoverUsers, meProfile, requestRefund, updatePreferences, userProfileByUserId } from '../controllers/user.controller.js';
 
 
 const router = express.Router();
@@ -16,6 +16,7 @@ router.put("/update-preferences", isAuthenticated, updatePreferences);
 
 router.post("/create-checkout-session", isAuthenticated, createCheckoutSession);
 router.post("/cancel-subscription", isAuthenticated, cancelSubscription);
+router.post("/request-refund", isAuthenticated, requestRefund);
 
 
 
