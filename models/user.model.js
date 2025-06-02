@@ -98,7 +98,7 @@ const userSchema = new mongoose.Schema({
         boosts: { type: Number, default: 0 }, // Platinum feature
         superlikes: { type: Number, default: 0 }, // Platinum feature
         stripeCustomerId: { type: String, default: null },
-        stripeSubscriptionId: { type: String, default: null },
+        stripeSubscriptionId: { type: String, default: "" },
         lastReset: { type: Date, default: Date.now },
     },
     subscriptionHistory: [
@@ -110,8 +110,8 @@ const userSchema = new mongoose.Schema({
             stripeSubscriptionId: {
                 type: String,
             },
-            startDate: { type: Date },
-            endDate: { type: Date },
+            startDate: { type: Date, default: null },
+            endDate: { type: Date, default: null },
             status: {
                 type: String,
                 enum: ["active", "canceled", "refunded"],
