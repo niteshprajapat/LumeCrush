@@ -43,7 +43,14 @@ const videoCallSchema = new mongoose.Schema({
             type: String,
             default: "",
         },
-    }
+    },
+    startTime: {
+        type: Date,
+        default: Date.now,
+    },
+    endTime: {
+        type: Date,
+    },
 
 
 }, { timestamps: true });
