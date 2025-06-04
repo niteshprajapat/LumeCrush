@@ -85,3 +85,60 @@ export const startVideoCall = async (req, res) => {
         });
     }
 }
+
+// endVideoCall
+export const endVideoCall = async (req, res) => {
+    try {
+        const { videoCallId } = req.body;
+        const userId = req.user._id;
+
+        if (!videoCallId) {
+            return res.status(400).json({
+                success: false,
+                message: "videoCallId is required!",
+            });
+        }
+
+        const videoCall = await VideoCall.findById(videoCallId);
+        if (!videoCall || videoCall.isDeleted) {
+            return res.status(400).json({
+                success: false,
+                message: "VideoCall Not Found!",
+            });
+        }
+
+        if (videoCall.user1.toString() !== userId.toString() && videoCall.user2.toString() !== userId.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not part of this video call!",
+            });
+        }
+
+
+        if (videoCall.status === "ended") {
+            return res.status(404).json({
+                success: false,
+                message: "Video call is already Ended!",
+            });
+        }
+
+
+        videoCall.status = "ended";
+        videoCall.isDeleted = true;
+        videoCall.endTime = new Date();
+        await videoCall.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Video call ended successfully!",
+        });
+
+
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Error in endVideoCall API!",
+        });
+    }
+}
