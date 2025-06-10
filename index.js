@@ -7,6 +7,7 @@ import userRoutes from './routes/user.routes.js';
 import swipeRoutes from './routes/swipe.routes.js';
 import messageRoutes from './routes/message.routes.js';
 import stripeRoutes from './routes/stripe.routes.js';
+import videocallRoutes from './routes/videocall.routes.js';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 
@@ -48,7 +49,7 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/swipe", swipeRoutes);
 app.use("/api/v1/message", messageRoutes);
-// app.use("/api/v1/stripe", stripeRoutes);
+app.use("/api/v1/videocalling", videocallRoutes);
 
 
 // Health Route
