@@ -17,6 +17,8 @@ dotenv.config({});
 
 const AGORA_APP_ID = process.env.AGORA_APP_ID;
 const AGORA_APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE;
+const AGORA_CUSTOMER_ID = process.env.AGORA_CUSTOMER_ID;
+const AGORA_CUSTOMER_SECRET = process.env.AGORA_CUSTOMER_SECRET;
 
 
 // startVideoCall
@@ -212,7 +214,11 @@ export const startRecording = async (req, res) => {
             },
         });
 
+        console.log("acquireResponse", acquireResponse);
+        console.log("token", token);
+
         const resourceId = acquireResponse.data.resourceId;
+        console.log("resourceId", resourceId);
 
         // Start recording with Cloudinary storage configuration
         const startResponse = await axios.post(`https://api.agora.io/v1/apps/${AGORA_APP_ID}/cloud_recording/resourceid/${resourceId}/mode/mix/start`, {
@@ -237,11 +243,13 @@ export const startRecording = async (req, res) => {
         }, {
             headers: {
                 Authorization: `Basic ${Buffer.from(
-                    `${process.env.AGORA_CUSTOMER_ID}:${process.env.AGORA_CUSTOMER_SECRET}`
+                    `${AGORA_CUSTOMER_ID}:${AGORA_CUSTOMER_SECRET}`
                 ).toString("base64")}`,
                 "Content-Type": "application/json",
             }
         });
+
+        console.log("startResponse", startResponse);
 
         videoCall.recording.status = "started";
         videoCall.recording.resourceId = resourceId;
