@@ -2,6 +2,7 @@ import User from "../models/user.model.js";
 import { logger } from "../utils/logger.js"
 import stripe from 'stripe';
 import dotenv from 'dotenv';
+import { limits } from "argon2";
 dotenv.config({});
 
 
@@ -850,6 +851,60 @@ export const getBillingDetails = async (req, res) => {
 // getInvoices
 export const getInvoices = async (req, res) => {
     try {
+        const userId = req.user._id;
+        const user = await User.findById(userId);
+
+        if (!user || user.isDeleted) {
+            return res.status(404).json({
+                success: false,
+                message: "User Not Found!",
+            });
+        }
+
+        if (!user.subscription.stripeCustomerId) {
+            return res.status(200).json({
+                success: true,
+                message: "No invoices found.",
+                invoices: [],
+            });
+        }
+
+        const invoices = await stripeClient.invoices.list({
+            customer: user.subscription.stripeCustomerId,
+            limit: 10,
+        });
+
+        console.log("INVOIS", invoices);
+
+        const invoiceData = await Promise.all(
+            invoices.data.map(async (invoice) => {
+                let refundStatus = 'no_charge';
+                if (invoice.charge) {
+                    console.log("this hit?")
+                    const charge = await stripeClient.charges.retrieve(invoice.charge);
+                    refundStatus = charge.refunded ? 'refunded' : 'not_refunded';
+                }
+                return {
+                    id: invoice.id,
+                    amount: invoice.total / 100,
+                    currency: invoice.currency,
+                    date: new Date(invoice.created * 1000).toLocaleDateString(),
+                    status: invoice.status,
+                    invoiceUrl: invoice.hosted_invoice_url,
+                    pdfUrl: invoice.invoice_pdf,
+                    refundStatus,
+                };
+            })
+        )
+
+
+        return res.status(200).json({
+            success: true,
+            message: "Invoices fetched successfully!",
+            invoices: invoiceData,
+            total: invoiceData.length,
+        });
+
 
     } catch (error) {
         logger.error(`Error in getInvoices API`);
