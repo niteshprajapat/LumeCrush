@@ -416,6 +416,14 @@ export const createCheckoutSession = async (req, res) => {
             });
         }
 
+        if (user.subscription.plan === "platinum" && user.subscription.expiry && new Date(user.subscription.expiry) > new Date()) {
+            return res.status(400).json({
+                success: false,
+                message: `You already have an active Platinum subscription until ${new Date(user.subscription.expiry).toLocaleDateString()}. Please wait until it expires to purchase a new plan.`,
+            });
+        }
+
+
         let stripeCustomerId = user.subscription.stripeCustomerId;
         if (!stripeCustomerId) {
             const customer = await stripeClient.customers.create({
@@ -536,6 +544,118 @@ export const cancelSubscription = async (req, res) => {
 
 
 // requestRefund
+// export const requestRefund = async (req, res) => {
+//     try {
+//         const userId = req.user._id;
+//         const user = await User.findById(userId);
+
+//         if (!user || user.isDeleted) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "User Not Found!",
+//             });
+//         }
+
+//         const activeSubscriptionId = user.subscription.stripeSubscriptionId;
+//         if (!activeSubscriptionId) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "No active recurring subscription found for refund!",
+//             });
+//         }
+
+//         const subscription = await stripeClient.subscriptions.retrieve(activeSubscriptionId);
+//         console.log("activeSubscriptionId => ", subscription);
+
+//         const latestInvoice = await stripeClient.invoices.list({
+//             subscription: activeSubscriptionId,
+//             status: 'paid',
+//             limit: 1,
+//         });
+
+//         console.log("latestInvoice => ", latestInvoice);
+
+//         // const latestPaidInvoice = latestInvoice.data.find(invoice => invoice.charge && invoice.paid);
+//         const latestPaidInvoice = latestInvoice.data.find(invoice => invoice.amount_paid && invoice.status);
+//         // if (!latestInvoice.data.length || !latestInvoice.data[0].charge) {
+
+//         console.log("latestPaidInvoice", latestPaidInvoice);
+//         if (!latestPaidInvoice) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "No recent paid invoice with a charge found for refund!",
+//             });
+//         }
+
+//         // const paymentIntentId = latestPaidInvoice.data[0].charge;
+//         const paymentIntentId = latestPaidInvoice.status;
+//         const paymentDate = new Date(latestPaidInvoice.created * 1000);
+//         const daysSincePayment = (Date.now() - paymentDate) / (24 * 60 * 60 * 1000);
+
+//         if (daysSincePayment > 7) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Refund request is outside the 7-day refund policy window for recurring payments!",
+//             });
+//         }
+
+//         const refund = await stripeClient.refunds.create({
+//             charge: paymentIntentId,
+//             reason: "requested_by_customer",
+//         });
+
+//         // Cancel the subscription to prevent further charges
+//         await stripeClient.subscriptions.update(
+//             activeSubscriptionId,
+//             { cancel_at_period_end: true },
+//         );
+
+//         const subscriptionEntry = user.subscriptionHistory.find(
+//             entry => entry.stripeSubscriptionId === activeSubscriptionId
+//         );
+
+//         if (subscriptionEntry) {
+//             subscriptionEntry.status = 'refunded';
+//             subscriptionEntry.endDate = new Date();
+//         } else {
+//             user.subscriptionHistory.push({
+//                 plan: user.subscription.plan,
+//                 stripeSubscriptionId: activeSubscriptionId,
+//                 startDate: new Date(subscription.created * 1000),
+//                 endDate: new Date(),
+//                 status: 'refunded',
+//             });
+//         }
+
+//         user.subscription.plan = 'free';
+//         user.subscription.expiry = new Date();
+//         user.subscription.swipeLimit = 100;
+//         user.subscription.superlikes = 0;
+//         user.subscription.boosts = 0;
+//         user.subscription.stripeSubscriptionId = null;
+//         user.subscription.lastReset = new Date();
+//         await user.save();
+
+//         return res.status(200).json({
+//             success: true,
+//             message: "Refund processed successfully for recurring subscription!",
+//             refundId: refund.id,
+//         });
+
+
+
+//     } catch (error) {
+//         logger.error(error);
+//         return res.status(500).json({
+//             success: false,
+//             message: "Error in requestRefund API!"
+//         })
+//     }
+// }
+
+
+
+// requestRefund
 export const requestRefund = async (req, res) => {
     try {
         const userId = req.user._id;
@@ -557,48 +677,67 @@ export const requestRefund = async (req, res) => {
         }
 
         const subscription = await stripeClient.subscriptions.retrieve(activeSubscriptionId);
-        console.log("activeSubscriptionId => ", subscription);
+        logger.debug("Retrieved subscription: ", JSON.stringify(subscription, null, 2));
 
-        const latestInvoice = await stripeClient.invoices.list({
+        const latestInvoices = await stripeClient.invoices.list({
             subscription: activeSubscriptionId,
+            status: 'paid',
             limit: 1,
         });
 
-        console.log("latestInvoice => ", latestInvoice);
+        logger.debug("Latest invoices: ", JSON.stringify(latestInvoices, null, 2));
 
-        if (!latestInvoice.data.length || !latestInvoice.data[0].charge) {
+        if (!latestInvoices.data.length || !latestInvoices.data[0].charge) {
+            logger.error("No paid invoice with a charge found for subscription ID: " + activeSubscriptionId);
             return res.status(400).json({
                 success: false,
-                message: "No recent payment found for refund!",
+                message: "No recent paid invoice with a charge found for refund!",
             });
         }
 
-        const paymentIntentId = latestInvoice.data[0].charge;
-        const paymentDate = new Date(latestInvoice.data[0].created * 1000);
+        const latestPaidInvoice = latestInvoices.data[0];
+        const chargeId = latestPaidInvoice.charge;
+        const paymentDate = new Date(latestPaidInvoice.created * 1000);
         const daysSincePayment = (Date.now() - paymentDate) / (24 * 60 * 60 * 1000);
 
+        logger.debug("Charge ID: ${chargeId}, Payment Date: ", paymentDate.toLocaleString(), ", Days Since Payment: ", daysSincePayment);
+
         if (daysSincePayment > 7) {
+            logger.warn(`Refund request denied for user ${userId}: Payment is ${daysSincePayment.toFixed(2)} days old, outside 7-day policy`);
             return res.status(400).json({
                 success: false,
                 message: "Refund request is outside the 7-day refund policy window for recurring payments!",
             });
         }
 
+        // Check if charge has already been refunded
+        const charge = await stripeClient.charges.retrieve(chargeId);
+        if (charge.refunded) {
+            logger.warn(`Charge ${chargeId} already refunded for user ${userId}`);
+            return res.status(400).json({
+                success: false,
+                message: "This payment has already been refunded!",
+            });
+        }
+
         const refund = await stripeClient.refunds.create({
-            charge: paymentIntentId,
+            charge: chargeId,
             reason: "requested_by_customer",
+            metadata: { subscription_id: activeSubscriptionId },
         });
+
+        logger.info(`Refund created for user ${userId}, refund ID: ${refund.id}`);
 
         // Cancel the subscription to prevent further charges
         await stripeClient.subscriptions.update(
             activeSubscriptionId,
-            { cancel_at_period_end: true },
+            { cancel_at_period_end: true }
         );
 
+        // Update subscription history
         const subscriptionEntry = user.subscriptionHistory.find(
-            entry => entry.stripeSubscriptionId === activeSubscriptionId
+            entry => entry.stripeSubscriptionId === activeSubscriptionId && entry.status !== 'refunded'
         );
-
         if (subscriptionEntry) {
             subscriptionEntry.status = 'refunded';
             subscriptionEntry.endDate = new Date();
@@ -612,8 +751,9 @@ export const requestRefund = async (req, res) => {
             });
         }
 
+        // Reset user subscription to free plan
         user.subscription.plan = 'free';
-        user.subscription.expiry = new Date();
+        user.subscription.expiry = null;
         user.subscription.swipeLimit = 100;
         user.subscription.superlikes = 0;
         user.subscription.boosts = 0;
@@ -621,19 +761,18 @@ export const requestRefund = async (req, res) => {
         user.subscription.lastReset = new Date();
         await user.save();
 
+        logger.info(`User ${userId} subscription reset to free after refund`);
+
         return res.status(200).json({
             success: true,
             message: "Refund processed successfully for recurring subscription!",
             refundId: refund.id,
         });
-
-
-
     } catch (error) {
-        logger.error(error);
+        logger.error(`Error in requestRefund API for user ${req.user._id}: ${error.message}`);
         return res.status(500).json({
             success: false,
-            message: "Error in requestRefund API!"
-        })
+            message: `Error in requestRefund API: ${error.message}`,
+        });
     }
-}
+};
