@@ -776,3 +776,86 @@ export const requestRefund = async (req, res) => {
         });
     }
 };
+
+
+
+// getBillingDetails
+export const getBillingDetails = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const user = await User.findById(userId);
+
+        if (!user || user.isDeleted) {
+            return res.status(400).json({
+                success: false,
+                message: "User Not Found!",
+            });
+        }
+
+
+        if (!user.subscription.stripeSubscriptionId) {
+            return res.status(200).json({
+                success: true,
+                message: "No active subscription found",
+                subscription: {
+                    plan: user.subscription.plan,
+                    status: "inactive",
+                    nextBillingDate: null,
+                }
+            });
+        }
+
+
+        const subscription = await stripeClient.subscriptions.retrieve(user.subscription.stripeSubscriptionId);
+
+
+        // Calculate current_period_end
+        // const billingCycleAnchorDate = new Date(subscription.billing_cycle_anchor * 1000);
+        // const currentPeriodEndDate = new Date(
+        //     billingCycleAnchorDate.setMonth(billingCycleAnchorDate.getMonth() + subscription.plan.interval_count)
+        // );
+        // const currentPeriodEnd = Math.floor(currentPeriodEndDate.getTime() / 1000);
+
+        // const nextBillingDate = new Date(currentPeriodEnd)
+
+        const nextBillingDate = subscription.current_period_end
+            ? new Date(subscription.current_period_end * 1000).toLocaleDateString()
+            : null;
+
+        console.log("BILL SUBSC", subscription);
+
+        return res.status(200).json({
+            success: true,
+            message: "Billing details fetched successfully!",
+            subscription: {
+                plan: user.subscription.plan,
+                status: subscription.status,
+                nextBillingDate,
+                subscriptionId: user.subscription.stripeSubscriptionId,
+            },
+        })
+
+
+    } catch (error) {
+        logger.error(`Error in getBillingDetails API`);
+        return res.status(500).json({
+            success: false,
+            message: `Error in getBillingDetails API: ${error.message}`,
+        });
+    }
+}
+
+
+
+// getInvoices
+export const getInvoices = async (req, res) => {
+    try {
+
+    } catch (error) {
+        logger.error(`Error in getInvoices API`);
+        return res.status(500).json({
+            success: false,
+            message: `Error in getInvoices API: ${error.message}`,
+        });
+    }
+}
