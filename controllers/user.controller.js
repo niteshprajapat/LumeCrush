@@ -265,7 +265,6 @@ export const getDiscoverUsers = async (req, res) => {
 
 
         return res.status(200).json({
-
             success: true,
             message: `Fetched discoveries Successfully!`,
             users,
@@ -353,6 +352,149 @@ export const getUsersBySameDatingGoals = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Error in getUsersBySameDatingGoals API!"
+        })
+    }
+}
+
+
+// getUsersByCommonReligionCommunity
+export const getUsersByCommonReligionCommunity = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const user = await User.findById(userId);
+        if (!user || user.isDeleted) {
+            return res.status(404).json({
+                success: false,
+                message: "User Not Found!",
+            });
+        }
+
+
+        const userPreferences = user.preferences || {};
+        const {
+            minAge = userPreferences.minAge || 18,
+            maxAge = userPreferences.maxAge || 100,
+            gender = userPreferences.gender || "all",
+            maxDistance = userPreferences.maxDistance || 50,
+            religion = user.religion
+        } = req.query;
+
+
+        if (!religion) {
+            return res.status(400).json({
+                success: false,
+                message: "Religion is required!"
+            });
+        }
+
+
+        const users = await User.find({
+            _id: {
+                $ne: userId,
+            },
+            age: {
+                $gte: Number(minAge),
+                $lte: Number(maxAge)
+            },
+            gender: gender === "all" ? { in: ["male", "female", "all"] } : gender,
+            religion: religion,
+            location: {
+                $near: {
+                    $geometry: user.location,
+                    $maxDistance: Number(maxDistance) * 1000  // distance in km to m
+                },
+            },
+            interests: { $in: interests },
+            isDeleted: false,
+            status: "active",
+        }).sort({ createdAt: -1 }).limit(5);
+
+
+        logger.info(`Fetched users with religion: ${religion} for user ${userId}`);
+        return res.status(200).json({
+            success: true,
+            message: "Fetched users with common religion community successfully!",
+            users,
+            total: users.length,
+        });
+
+
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Error in getUsersByCommonReligionCommunity API!"
+        })
+    }
+}
+
+// getUsersBySameInterests
+export const getUsersBySameInterests = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const user = await User.findById(userId);
+        if (!user || user.isDeleted) {
+            return res.status(404).json({
+                success: false,
+                message: "User Not Found!",
+            });
+        }
+
+
+        const userPreferences = user.preferences || {};
+        const {
+            minAge = userPreferences.minAge || 18,
+            maxAge = userPreferences.maxAge || 100,
+            gender = userPreferences.gender || "all",
+            maxDistance = userPreferences.maxDistance || 50,
+            religion = user.religion
+        } = req.query;
+
+
+        if (!religion) {
+            return res.status(400).json({
+                success: false,
+                message: "Religion is required!"
+            });
+        }
+
+
+        const users = await User.find({
+            _id: {
+                $ne: userId,
+            },
+            age: {
+                $gte: Number(minAge),
+                $lte: Number(maxAge)
+            },
+            gender: gender === "all" ? { in: ["male", "female", "all"] } : gender,
+            religion: religion,
+            location: {
+                $near: {
+                    $geometry: user.location,
+                    $maxDistance: Number(maxDistance) * 1000  // distance in km to m
+                },
+            },
+            interests: { $in: interests },
+            isDeleted: false,
+            status: "active",
+        }).sort({ createdAt: -1 }).limit(5);
+
+
+        logger.info(`Fetched users with religion: ${religion} for user ${userId}`);
+        return res.status(200).json({
+            success: true,
+            message: "Fetched users with common religion community successfully!",
+            users,
+            total: users.length,
+        });
+
+
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Error in getUsersByCommonReligionCommunity API!"
         })
     }
 }
