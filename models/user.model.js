@@ -33,6 +33,12 @@ const userSchema = new mongoose.Schema({
             default: "",
         },
     },
+    images: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Post",
+        }
+    ],
     age: {
         type: Number,
         required: true,
@@ -135,6 +141,12 @@ const userSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
+
+
+// Validation to limit images to 6
+userSchema.path('images').validate(function (value) {
+    return value.length <= 6;
+}, 'Cannot upload more than 6 photos.');
 
 // Indexes for performance
 userSchema.index({ location: '2dsphere' }); // Geospatial queries for users
