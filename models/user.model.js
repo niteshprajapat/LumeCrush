@@ -97,6 +97,60 @@ const userSchema = new mongoose.Schema({
         enum: ["active", "suspended", "banned"],
         default: "active",
     },
+    starSign: {
+        type: String,
+        enum: [
+            "aries",
+            "taurus",
+            "gemini",
+            "cancer",
+            "leo",
+            "virgo",
+            "libra",
+            "scorpio",
+            "sagittarius",
+            "capricorn",
+            "aquarius",
+            "pisces"
+        ],
+        required: true,
+    },
+    religion: {
+        type: String,
+        enum: [
+            "hindu",
+            "muslim",
+            "christian",
+            "sikh",
+            "buddhist",
+            "jain",
+            "jewish",
+            "parsi",
+            "bahai",
+            "spiritual",
+            "atheist",
+            "agnostic",
+            "other"
+        ],
+        default: "other",
+        required: true,
+    },
+    lookingFor: {
+        type: String,
+        enum: [
+            "long-term relationship",
+            "fun casual dates",
+            "marriage",
+            "intemacy without commitment",
+            "a life partner",
+            "ethical non-monogamy",
+        ],
+        required: true,
+    },
+
+
+
+
     subscription: {
         plan: { type: String, enum: ['free', 'platinum'], default: 'free' },
         expiry: { type: Date, default: null }, // Null for Free plan
