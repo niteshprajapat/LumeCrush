@@ -1,6 +1,6 @@
 import express from 'express';
 import { isAuthenticated } from '../middlewares/authMiddleware.js';
-import { cancelSubscription, createCheckoutSession, getBillingDetails, getDiscoverUsers, getInvoices, meProfile, requestRefund, updatePreferences, userProfileByUserId } from '../controllers/user.controller.js';
+import { cancelSubscription, createCheckoutSession, getBillingDetails, getDiscoverUsers, getInvoices, getUsersBySameDatingGoals, meProfile, requestRefund, updatePreferences, userProfileByUserId } from '../controllers/user.controller.js';
 
 
 const router = express.Router();
@@ -13,6 +13,11 @@ router.get("/me-profile", isAuthenticated, meProfile);
 router.get("/user-profile/:userId", isAuthenticated, userProfileByUserId);
 router.put("/update-preferences", isAuthenticated, updatePreferences);
 // router.put("/update-profile", isAuthenticated, updateProfile);
+
+
+// Filtered based apis
+router.get("/discover/dating-goals", isAuthenticated, getUsersBySameDatingGoals);
+
 
 router.post("/create-checkout-session", isAuthenticated, createCheckoutSession);
 router.post("/cancel-subscription", isAuthenticated, cancelSubscription);
