@@ -281,6 +281,98 @@ export const getDiscoverUsers = async (req, res) => {
     }
 }
 
+// New Filters api starts
+
+
+// getUsersBySameDatingGoals
+export const getUsersBySameDatingGoals = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const user = await User.findById(userId);
+        if (!user || user.isDeleted) {
+            return res.status(404).json({
+                success: false,
+                message: "User Not Found!",
+            });
+        }
+
+
+        const userPreferences = user.preferences || {};
+        const {
+            minAge = userPreferences.minAge || 18,
+            maxAge = userPreferences.maxAge || 100,
+            gender = userPreferences.gender || "all",
+            maxDistance = userPreferences.maxDistance || 50,
+            lookingFor = user.lookingFor
+        } = req.query;
+
+
+        if (!lookingFor) {
+            return res.status(400).json({
+                success: false,
+                message: "Dating goal is required!"
+            });
+        }
+
+
+        const users = await User.find({
+            _id: {
+                $ne: userId,
+            },
+            age: {
+                $gte: Number(minAge),
+                $lte: Number(maxAge)
+            },
+            gender: gender === "all" ? { in: ["male", "female", "all"] } : gender,
+            lookingFor: lookingFor,
+            location: {
+                $near: {
+                    $geometry: user.location,
+                    $maxDistance: Number(maxDistance) * 1000  // distance in km to m
+                },
+            },
+            interests: { $in: interests },
+            isDeleted: false,
+            status: "active",
+        }).sort({ createdAt: -1 }).limit(5);
+
+
+        logger.info(`Fetched users with dating goal: ${lookingFor} for user ${userId}`);
+        return res.status(200).json({
+            success: true,
+            message: "Fetched users with same dating goals successfully!",
+            users,
+            total: users.length,
+        });
+
+
+
+
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Error in getUsersBySameDatingGoals API!"
+        })
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+// New Filters api ends
+
+
+
+
+
 // meProfile
 export const meProfile = async (req, res) => {
     try {
@@ -877,11 +969,11 @@ export const getInvoices = async (req, res) => {
         console.log("INVOIS", invoices);
 
         const invoiceData = await Promise.all(
-            invoices.data.map(async (invoice) => {
+            invoices.data.map((invoice) => {
                 let refundStatus = 'no_charge';
                 if (invoice.charge) {
                     console.log("this hit?")
-                    const charge = await stripeClient.charges.retrieve(invoice.charge);
+                    const charge = stripeClient.charges.retrieve(invoice.charge);
                     refundStatus = charge.refunded ? 'refunded' : 'not_refunded';
                 }
                 return {
