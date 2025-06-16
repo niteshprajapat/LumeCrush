@@ -330,7 +330,6 @@ export const getUsersBySameDatingGoals = async (req, res) => {
                     $maxDistance: Number(maxDistance) * 1000  // distance in km to m
                 },
             },
-            interests: { $in: interests },
             isDeleted: false,
             status: "active",
         }).sort({ createdAt: -1 }).limit(5);
@@ -404,7 +403,6 @@ export const getUsersByCommonReligionCommunity = async (req, res) => {
                     $maxDistance: Number(maxDistance) * 1000  // distance in km to m
                 },
             },
-            interests: { $in: interests },
             isDeleted: false,
             status: "active",
         }).sort({ createdAt: -1 }).limit(5);
@@ -440,23 +438,26 @@ export const getUsersBySameInterests = async (req, res) => {
             });
         }
 
-
         const userPreferences = user.preferences || {};
+        const userInterests = user.interests || [];
+
         const {
             minAge = userPreferences.minAge || 18,
             maxAge = userPreferences.maxAge || 100,
             gender = userPreferences.gender || "all",
-            maxDistance = userPreferences.maxDistance || 50,
-            religion = user.religion
+            maxDistance = userPreferences.maxDistance || 100,
+            interests = userInterests.join(","),
         } = req.query;
 
-
-        if (!religion) {
+        if (!interests) {
             return res.status(400).json({
                 success: false,
-                message: "Religion is required!"
+                message: "Interests are required!",
             });
         }
+
+
+        const interestArray = interests.split(",").map((interest) => interest.trim());
 
 
         const users = await User.find({
@@ -464,31 +465,29 @@ export const getUsersBySameInterests = async (req, res) => {
                 $ne: userId,
             },
             age: {
-                $gte: Number(minAge),
-                $lte: Number(maxAge)
+                $gte: minAge,
+                $lte: minAge,
             },
-            gender: gender === "all" ? { in: ["male", "female", "all"] } : gender,
-            religion: religion,
+            gender: gender === "all" ? { $in: ["male", "female", "all"] } : gender,
+            interests: { $in: interestArray },
             location: {
                 $near: {
                     $geometry: user.location,
                     $maxDistance: Number(maxDistance) * 1000  // distance in km to m
                 },
             },
-            interests: { $in: interests },
             isDeleted: false,
             status: "active",
         }).sort({ createdAt: -1 }).limit(5);
 
+        logger.info(`Fetched users with interests: ${interests} for user ${userId}`);
 
-        logger.info(`Fetched users with religion: ${religion} for user ${userId}`);
         return res.status(200).json({
             success: true,
-            message: "Fetched users with common religion community successfully!",
+            message: `Fetched users with similar interests successfully!`,
             users,
             total: users.length,
         });
-
 
     } catch (error) {
         logger.error(error);
