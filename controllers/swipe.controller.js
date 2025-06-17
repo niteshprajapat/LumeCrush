@@ -57,7 +57,11 @@ export const swipeUser = async (req, res) => {
         });
 
 
-        swiper.subscription.swipeLimit -= 1;
+        // decrease swipe limit if only for like/right swipe
+        if (action === "like" || action === "superLike") {
+            swiper.subscription.swipeLimit -= 1;
+        }
+
 
         if (action === "superLike") {
             swiper.subscription.superlikes -= 1;
