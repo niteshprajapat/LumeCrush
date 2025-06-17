@@ -4,12 +4,14 @@ import helmet from 'helmet';
 import { connectDB } from './config/database.js';
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
+import postRoutes from './routes/post.routes.js';
 import swipeRoutes from './routes/swipe.routes.js';
 import messageRoutes from './routes/message.routes.js';
 import stripeRoutes from './routes/stripe.routes.js';
 import videocallRoutes from './routes/videocall.routes.js';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './middlewares/errorHandler.js';
+import { resetSwipeLimit } from './utils/resetSwipeLimit.js';
 
 
 // Configuration
@@ -47,6 +49,7 @@ app.use((req, res, next) => {
 // Route Middlewares
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/user", userRoutes);
+app.use("/api/v1/post", postRoutes);
 app.use("/api/v1/swipe", swipeRoutes);
 app.use("/api/v1/message", messageRoutes);
 app.use("/api/v1/videocalling", videocallRoutes);
@@ -65,6 +68,7 @@ app.get("/health", (req, res) => {
 app.use(errorHandler);
 
 app.listen(port, () => {
+    // resetSwipeLimit();  
     logger.info(`Server is running on port ${port}!`);
 });
 
