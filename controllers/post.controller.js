@@ -77,3 +77,69 @@ export const createPost = async (req, res) => {
         })
     }
 }
+
+// deletePost
+export const deletePost = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const postId = req.params.postId;
+
+
+
+        const user = await User.findById(userId);
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(404).json({
+                success: false,
+                message: "Post Not Found!",
+            });
+        }
+
+        if (post.userId.toString() !== userId.toString()) {
+            return res.status(400).json({
+                success: false,
+                message: "You can only delete your own post!",
+            });
+        }
+
+
+        if (post.media.public_id) {
+            try {
+                await cloudinary.uploader.destroy(post.media.public_id);
+            } catch (cloudinaryError) {
+                logger.error("Cloudinary deletion failed:", cloudinaryError);
+                return res.status(500).json({
+                    success: false,
+                    message: "Failed to delete media from Cloudinary!",
+                });
+            }
+        }
+
+        post.media.public_id = "";
+        post.media.url = "";
+        await post.save();
+
+        user.images = user.images.filter((image) => image.toString() !== postId.toString());
+        await user.save();
+
+
+
+
+
+
+        logger.info(`Post ${postId} deleted by user ${userId}`);
+
+
+        return res.status(201).json({
+            success: true,
+            message: "Post Deleted Successfully!",
+        })
+
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Error in deletePost API!"
+        })
+    }
+}
