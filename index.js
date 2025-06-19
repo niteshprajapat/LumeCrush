@@ -12,6 +12,7 @@ import videocallRoutes from './routes/videocall.routes.js';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { resetSwipeLimit } from './utils/resetSwipeLimit.js';
+import { updateAllUserLocations } from './utils/updateLocationCron.js';
 
 
 // Configuration
@@ -69,6 +70,7 @@ app.use(errorHandler);
 
 app.listen(port, () => {
     // resetSwipeLimit();  
+    // updateAllUserLocations();
     logger.info(`Server is running on port ${port}!`);
 });
 
