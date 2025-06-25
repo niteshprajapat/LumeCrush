@@ -190,6 +190,11 @@ const userSchema = new mongoose.Schema({
     },
     resetPasswordTokenExpires: {
         type: Date,
+    },
+
+    lastKnownIP: {
+        type: String,
+        default: "",
     }
 
 
