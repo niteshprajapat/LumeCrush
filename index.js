@@ -8,6 +8,7 @@ import postRoutes from './routes/post.routes.js';
 import swipeRoutes from './routes/swipe.routes.js';
 import messageRoutes from './routes/message.routes.js';
 import stripeRoutes from './routes/stripe.routes.js';
+import spotlightRoutes from './routes/spotlight.routes.js';
 import videocallRoutes from './routes/videocall.routes.js';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './middlewares/errorHandler.js';
@@ -53,6 +54,7 @@ app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/post", postRoutes);
 app.use("/api/v1/swipe", swipeRoutes);
 app.use("/api/v1/message", messageRoutes);
+app.use("/api/v1/spotlights", spotlightRoutes);
 app.use("/api/v1/videocalling", videocallRoutes);
 
 
