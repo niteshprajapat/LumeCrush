@@ -1,8 +1,9 @@
 import User from "../models/user.model.js";
+import Spotlight from '../models/spotlight.model.js';
 import { logger } from "../utils/logger.js"
 import stripe from 'stripe';
 import dotenv from 'dotenv';
-import { limits } from "argon2";
+import axios from "axios";
 dotenv.config({});
 
 
@@ -16,6 +17,124 @@ const stripeClient = stripe(process.env.STRIPE_SECRET_KEY);
 
 
 // handle WEBHOOK
+
+// handle location (lat/long) using IP addres
+
+export const updateUserLocation = async (user, IP) => {
+    try {
+
+        console.log("USER => ", user);
+
+        if (!IP || IP === '127.0.0.1' || IP === '::1') {
+            logger.warn(`Invalid or localhost IP for user ${user._id}: ${IP}`);
+            return {
+                success: false,
+                message: "Invalid or localhost IP address",
+            }
+        }
+
+        logger.info(`Fetching location for IP: ${IP} for user ${user._id}`);
+
+        // fetch lat/long from ip-api.com
+        const geoResponse = await axios.get(`http://ip-api.com/json/${IP}`);
+        const geoData = await geoResponse.data;
+
+        console.log("GEODATA => ", geoData);
+
+        if (geoData.status !== 'success') {
+            logger.error(`Failed to fetch location for IP ${ip}: ${geoData.message || 'Unknown error'}`);
+            return { success: false, message: "Failed to fetch location from IP" };
+        }
+
+
+        const { lat, lon } = geoData;
+        if (!lat || !lon) {
+            logger.error(`No lat/long returned for IP ${IP}`);
+            return { success: false, message: "Invalid location data received" };
+        }
+
+        if (lon < -180 || lon > 180 || lat < -90 || lat > 90) {
+            logger.error(`Invalid coordinates for IP ${IP}: [${lon}, ${lat}]`);
+            return { success: false, message: "Invalid coordinates received" };
+        }
+
+        user.location = {
+            type: "Point",
+            coordinates: [lon, lat],
+        };
+
+        user.lastKnownIP = IP;
+
+        await user.save();
+
+        logger.info(`Location updated for user ${user._id}: [${lon}, ${lat}]`);
+
+        return {
+            success: true,
+            location: {
+                latitude: lat,
+                longitude: lon,
+                city: geoData.city || 'Unknown',
+                country: geoData.country || 'Unknown',
+            }
+        }
+
+
+    } catch (error) {
+        logger.error(`Error updating location for user ${user._id}: ${error.message}`);
+        return { success: false, message: `Error updating location: ${error.message}` };
+    }
+}
+
+
+// API to update location based on IP (manual trigger)
+// updateLocationByIP
+export const updateLocationByIP = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const user = await User.findById(userId);
+        if (!user || user.isDeleted) {
+            logger.error(`User not found for ID: ${userId}`);
+            return res.status(404).json({
+                success: false,
+                message: "User Not Found!",
+            });
+        }
+
+        // Extract IP address from request
+        let ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+        if (Array.isArray(ip)) {
+            ip = ip[0];
+        }
+
+        ip = ip.replace(/^::ffff:/, '');
+
+        const result = await updateUserLocation(user, ip);
+        if (!result.success) {
+            return res.status(400).json({
+                success: false,
+                message: result.message,
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Location updated successfully based on IP!",
+            location: result.location,
+        });
+
+
+
+    } catch (error) {
+        logger.error(`Error in updateLocationByIP API for user ${req.user._id}: ${error.message}`);
+        return res.status(500).json({
+            success: false,
+            message: `Error in updateLocationByIP API: ${error.message}`,
+        });
+    }
+}
+
+
 
 export const handleStripeWebhook = async (req, res) => {
     const sig = req.headers['stripe-signature'];
@@ -207,18 +326,102 @@ export const handleStripeWebhook = async (req, res) => {
 
 
 // getDiscoverUsers
+// export const getDiscoverUsers = async (req, res) => {
+//     try {
+
+
+//         const userId = req.user._id;
+//         const user = await User.findById(userId);
+//         console.log("user", user);
+
+//         // const { minAge, maxAge, gender, maxDistance } = user.preferences;
+//         // const userInterests = user.interests || [];
+
+//         // Default to stored preferences
+//         const userPreferences = user.preferences || {};
+//         const userInterests = user.interests || [];
+
+//         const {
+//             minAge = userPreferences.minAge || 18,
+//             maxAge = userPreferences.maxAge || 100,
+//             gender = userPreferences.gender || "all",
+//             maxDistance = userPreferences.maxDistance || 100,
+//             interests = userInterests,
+//         } = req.query;
+
+
+
+//         console.log(req.query);
+//         console.log("storedpreferences", interests);
+
+
+//         const activeSpotlightUsers = await Spotlight.find({
+//             isActive: true,
+//             endTime: {
+//                 $gt: new Date(),
+//             }
+//         }).select("userId");
+
+
+
+
+//         // interest based filter pending
+//         const users = await User.find({
+//             _id: {
+//                 $ne: userId,
+//                 $in: activeSpotlightUsers
+//             },
+//             age: {
+//                 $gte: Number(minAge),
+//                 $lte: Number(maxAge),
+//             },
+//             gender: gender === "all" ? { $in: ["male", "female", "other"] } : gender,
+//             location: {
+//                 $near: {
+//                     $geometry: user.location,
+//                     $maxDistance: Number(maxDistance) * 1000  // distance in km
+//                 },
+//             },
+//             interests: { $in: interests },
+//             isDeleted: false,
+//             status: "active",
+//         })
+//             .select('username firstName profilePicture age gender bio')
+//             .sort({ createdAt: -1 })
+//         // .limit(10);
+
+//         console.log("users", users);
+
+
+//         return res.status(200).json({
+//             success: true,
+//             message: `Fetched discoveries Successfully!`,
+//             users,
+//             total: users.length,
+//         });
+
+//     } catch (error) {
+//         logger.error(error);
+//         return res.status(500).json({
+//             success: false,
+//             message: "Error in getDiscoverUsers API!"
+//         })
+//     }
+// }
+
+
+
 export const getDiscoverUsers = async (req, res) => {
     try {
-
-
         const userId = req.user._id;
         const user = await User.findById(userId);
-        console.log("user", user);
+        if (!user || user.isDeleted) {
+            return res.status(404).json({
+                success: false,
+                message: "User Not Found!",
+            });
+        }
 
-        // const { minAge, maxAge, gender, maxDistance } = user.preferences;
-        // const userInterests = user.interests || [];
-
-        // Default to stored preferences
         const userPreferences = user.preferences || {};
         const userInterests = user.interests || [];
 
@@ -230,39 +433,59 @@ export const getDiscoverUsers = async (req, res) => {
             interests = userInterests,
         } = req.query;
 
+        const interestArray = Array.isArray(interests) ? interests : interests.split(",").map(i => i.trim());
 
+        // Find users with active spotlights
+        const activeSpotlightUsers = await Spotlight.find({
+            isActive: true,
+            endTime: { $gt: new Date() }
+        }).distinct('userId');
 
-        console.log(req.query);
-        console.log("storedpreferences", interests);
+        let users = [];
+        if (activeSpotlightUsers.length > 0) {
+            const spotlightQuery = {
+                _id: { $ne: userId, $in: activeSpotlightUsers },
+                age: { $gte: Number(minAge), $lte: Number(maxAge) },
+                gender: gender === "all" ? { $in: ["male", "female", "other"] } : gender,
+                interests: { $in: interestArray },
+                location: {
+                    $near: {
+                        $geometry: user.location,
+                        $maxDistance: Number(maxDistance) * 1000
+                    },
+                },
+                isDeleted: false,
+                status: "active",
+            };
 
+            const spotlightUsers = await User.find(spotlightQuery)
+                .select('username firstName profilePicture age gender bio');
+            users.push(...spotlightUsers);
+        }
 
-
-        // interest based filter pending
-        const users = await User.find({
-            _id: {
-                $ne: userId,
-            },
-            age: {
-                $gte: Number(minAge),
-                $lte: Number(maxAge),
-            },
+        // Fetch non-spotlight users
+        const nonSpotlightQuery = {
+            _id: { $ne: userId, $nin: activeSpotlightUsers },
+            age: { $gte: Number(minAge), $lte: Number(maxAge) },
             gender: gender === "all" ? { $in: ["male", "female", "other"] } : gender,
+            interests: { $in: interestArray },
             location: {
                 $near: {
                     $geometry: user.location,
-                    $maxDistance: Number(maxDistance) * 1000  // distance in km
+                    $maxDistance: Number(maxDistance) * 1000
                 },
             },
-            interests: { $in: interests },
             isDeleted: false,
             status: "active",
-        })
-            .select('username firstName profilePicture age gender bio')
-            .sort({ createdAt: -1 })
-        // .limit(10);
+        };
 
-        console.log("users", users);
+        const otherUsers = await User.find(nonSpotlightQuery)
+            .select('username firstName profilePicture age gender bio');
+        users.push(...otherUsers);
 
+        if (users.length > 100) {
+            logger.warn(`Large number of users returned (${users.length}) for user ${userId} in getDiscoverUsers`);
+        }
 
         return res.status(200).json({
             success: true,
@@ -270,15 +493,15 @@ export const getDiscoverUsers = async (req, res) => {
             users,
             total: users.length,
         });
-
     } catch (error) {
-        logger.error(error);
+        logger.error(`Error in getDiscoverUsers API: ${error.message}`);
         return res.status(500).json({
             success: false,
-            message: "Error in getDiscoverUsers API!"
-        })
+            message: "Error in getDiscoverUsers API!",
+        });
     }
-}
+};
+
 
 // New Filters api starts
 
@@ -466,7 +689,7 @@ export const getUsersBySameInterests = async (req, res) => {
             },
             age: {
                 $gte: minAge,
-                $lte: minAge,
+                $lte: maxAge,
             },
             gender: gender === "all" ? { $in: ["male", "female", "all"] } : gender,
             interests: { $in: interestArray },
@@ -538,7 +761,7 @@ export const meProfile = async (req, res) => {
         logger.error(error);
         return res.status(500).json({
             success: false,
-            message: "Error in getDiscoverUsers API!"
+            message: "Error in meProfile API!"
         })
     }
 }
@@ -567,7 +790,7 @@ export const userProfileByUserId = async (req, res) => {
         logger.error(error);
         return res.status(500).json({
             success: false,
-            message: "Error in getDiscoverUsers API!"
+            message: "Error in userProfileById API!"
         })
     }
 }
@@ -622,7 +845,7 @@ export const updatePreferences = async (req, res) => {
         logger.error(error);
         return res.status(500).json({
             success: false,
-            message: "Error in getDiscoverUsers API!"
+            message: "Error in updatePreferences API!"
         })
     }
 }
