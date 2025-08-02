@@ -507,6 +507,78 @@ export const getDiscoverUsers = async (req, res) => {
 
 
 // getUsersBySameDatingGoals
+// export const getUsersBySameDatingGoals = async (req, res) => {
+//     try {
+//         const userId = req.user._id;
+//         const user = await User.findById(userId);
+//         if (!user || user.isDeleted) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "User Not Found!",
+//             });
+//         }
+
+
+//         const userPreferences = user.preferences || {};
+//         const {
+//             minAge = userPreferences.minAge || 18,
+//             maxAge = userPreferences.maxAge || 100,
+//             gender = userPreferences.gender || "all",
+//             maxDistance = userPreferences.maxDistance || 50,
+//             lookingFor = user.lookingFor
+//         } = req.query;
+
+
+//         if (!lookingFor) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Dating goal is required!"
+//             });
+//         }
+
+
+//         const users = await User.find({
+//             _id: {
+//                 $ne: userId,
+//             },
+//             age: {
+//                 $gte: Number(minAge),
+//                 $lte: Number(maxAge)
+//             },
+//             gender: gender === "all" ? { in: ["male", "female", "all"] } : gender,
+//             lookingFor: lookingFor,
+//             location: {
+//                 $near: {
+//                     $geometry: user.location,
+//                     $maxDistance: Number(maxDistance) * 1000  // distance in km to m
+//                 },
+//             },
+//             isDeleted: false,
+//             status: "active",
+//         }).sort({ createdAt: -1 }).limit(5);
+
+
+//         logger.info(`Fetched users with dating goal: ${lookingFor} for user ${userId}`);
+//         return res.status(200).json({
+//             success: true,
+//             message: "Fetched users with same dating goals successfully!",
+//             users,
+//             total: users.length,
+//         });
+
+
+
+
+//     } catch (error) {
+//         logger.error(error);
+//         return res.status(500).json({
+//             success: false,
+//             message: "Error in getUsersBySameDatingGoals API!"
+//         })
+//     }
+// }
+
+
 export const getUsersBySameDatingGoals = async (req, res) => {
     try {
         const userId = req.user._id;
@@ -536,26 +608,86 @@ export const getUsersBySameDatingGoals = async (req, res) => {
             });
         }
 
+        // active spotlight users
+        const activeSpotlightUsers = await Spotlight.find({
+            isActive: true,
+            endTime: {
+                $gt: new Date(),
+            },
+        }).select("userId");
 
-        const users = await User.find({
-            _id: {
-                $ne: userId,
-            },
-            age: {
-                $gte: Number(minAge),
-                $lte: Number(maxAge)
-            },
-            gender: gender === "all" ? { in: ["male", "female", "all"] } : gender,
+
+        let users = [];
+
+        if (activeSpotlightUsers.length > 0) {
+            const spotlightQuery = {
+                _id: {
+                    $ne: userId,
+                    $in: activeSpotlightUsers
+                },
+                age: {
+                    $gte: Number(minAge),
+                    $lte: Number(maxAge)
+                },
+                gender: gender === 'all' ? { $in: ["male", "female", "other"] } : gender,
+                lookingFor: lookingFor,
+                location: {
+                    $near: {
+                        $geometry: user.location,
+                        $maxDistance: Number(maxDistance) * 1000
+                    },
+                },
+                isDeleted: false,
+                status: "active",
+            }
+
+            const spotlightUsers = await User.find(spotlightQuery)
+                .select("username firstName profilePicture age gender bio")
+                .sort({ createdAt: -1 })
+                .limit(10);
+            users.push(...spotlightUsers);
+        }
+
+        const nonSpotlightQuery = {
+            _id: { $ne: userId, $nin: activeSpotlightUsers },
+            age: { $gte: Number(minAge), $lte: Number(maxAge) },
+            gender: gender === "all" ? { $in: ["male", "female", "other"] } : gender,
             lookingFor: lookingFor,
             location: {
                 $near: {
                     $geometry: user.location,
-                    $maxDistance: Number(maxDistance) * 1000  // distance in km to m
+                    $maxDistance: Number(maxDistance) * 1000
                 },
             },
             isDeleted: false,
             status: "active",
-        }).sort({ createdAt: -1 }).limit(5);
+        }
+
+        const otherUsers = await User.find(nonSpotlightQuery)
+            .select("username firstName profilePicture age gender bio")
+            .sort({ createdAt: -1 })
+            .limit(10);
+        users.push(...otherUsers);
+
+        // const users = await User.find({
+        //     _id: {
+        //         $ne: userId,
+        //     },
+        //     age: {
+        //         $gte: Number(minAge),
+        //         $lte: Number(maxAge)
+        //     },
+        //     gender: gender === "all" ? { in: ["male", "female", "all"] } : gender,
+        //     lookingFor: lookingFor,
+        //     location: {
+        //         $near: {
+        //             $geometry: user.location,
+        //             $maxDistance: Number(maxDistance) * 1000  // distance in km to m
+        //         },
+        //     },
+        //     isDeleted: false,
+        //     status: "active",
+        // }).sort({ createdAt: -1 }).limit(5);
 
 
         logger.info(`Fetched users with dating goal: ${lookingFor} for user ${userId}`);
@@ -577,7 +709,6 @@ export const getUsersBySameDatingGoals = async (req, res) => {
         })
     }
 }
-
 
 // getUsersByCommonReligionCommunity
 export const getUsersByCommonReligionCommunity = async (req, res) => {
